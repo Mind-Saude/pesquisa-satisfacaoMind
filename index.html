@@ -478,6 +478,22 @@
   }
   .export-btn:hover{background:var(--lilac-mid); color:#fffdf9;}
 
+  .danger-panel{border-color:rgba(196,122,90,0.4); background:#fffaf7;}
+  .danger-btn{
+    border:1.5px solid var(--clay-dark);
+    background:#fff;
+    color:var(--clay-dark);
+    border-radius:12px;
+    padding:12px 18px;
+    font-size:13px;
+    font-weight:600;
+    cursor:pointer;
+    transition:background .15s, color .15s;
+    font-family:'Karla', sans-serif;
+  }
+  .danger-btn:hover{background:var(--clay-dark); color:#fffdf9;}
+
+
   @media print{
     #surveyRoot, #gate, .refresh, .export-panel,
     #clientRow, #filterRow{display:none !important;}
@@ -726,6 +742,12 @@
           <button class="export-btn" id="exportCsvBtn">⬇ Baixar CSV (Excel)</button>
           <button class="export-btn" id="exportPdfBtn">🖨 Gerar PDF para o cliente</button>
         </div>
+      </div>
+
+      <div class="panel export-panel danger-panel">
+        <h2>Zona de risco</h2>
+        <p class="links-hint">Apaga permanentemente TODAS as respostas da planilha (de todos os clientes). Recomendado exportar o CSV antes.</p>
+        <button class="danger-btn" id="clearAllBtn">🗑 Limpar todas as respostas</button>
       </div>
 
       <div class="panel">
@@ -1158,6 +1180,47 @@
 
     document.getElementById('exportCsvBtn').addEventListener('click', exportCsv);
     document.getElementById('exportPdfBtn').addEventListener('click', () => window.print());
+    document.getElementById('clearAllBtn').addEventListener('click', clearAllResponses);
+
+    function clearAllResponses(){
+      const step1 = confirm('Isso vai apagar PERMANENTEMENTE todas as respostas de todos os clientes. Essa ação não pode ser desfeita. Deseja continuar?');
+      if(!step1) return;
+
+      const typed = prompt('Para confirmar, digite a senha de administrador:');
+      if(typed === null) return;
+      if(typed !== ADMIN_PASSWORD){
+        alert('Senha incorreta. Nenhuma resposta foi apagada.');
+        return;
+      }
+
+      const btn = document.getElementById('clearAllBtn');
+      btn.disabled = true;
+      btn.textContent = 'Limpando...';
+
+      const callbackName = 'jsonpClear_' + Date.now();
+      window[callbackName] = function(result){
+        delete window[callbackName];
+        if(script.parentNode) script.parentNode.removeChild(script);
+        btn.disabled = false;
+        btn.textContent = '🗑 Limpar todas as respostas';
+        if(result && result.status === 'cleared'){
+          alert('Todas as respostas foram apagadas.');
+          loadData();
+        } else {
+          alert('Não foi possível apagar (senha do servidor incorreta ou erro). Nada foi alterado.');
+        }
+      };
+
+      const script = document.createElement('script');
+      script.src = API_URL + '?action=clear&secret=' + encodeURIComponent(typed) + '&callback=' + callbackName;
+      script.onerror = function(){
+        delete window[callbackName];
+        btn.disabled = false;
+        btn.textContent = '🗑 Limpar todas as respostas';
+        alert('Erro ao tentar limpar as respostas.');
+      };
+      document.body.appendChild(script);
+    }
 
     function exportCsv(){
       if(!lastFiltered.length){
